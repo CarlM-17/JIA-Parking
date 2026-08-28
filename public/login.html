@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JIA Parking - Login</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: linear-gradient(135deg, #1e40af, #3b82f6); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .box { background: white; padding: 32px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); max-width: 400px; width: 100%; }
+  h1 { color: #1e40af; margin-bottom: 8px; }
+  p { color: #6b7280; margin-bottom: 20px; font-size: 14px; }
+  input, button { width: 100%; padding: 12px; font-size: 16px; border-radius: 6px; border: 1px solid #d1d5db; margin-bottom: 12px; }
+  button { background: #1e40af; color: white; border: none; cursor: pointer; font-weight: 600; }
+  button:hover { background: #1e3a8a; }
+  .error { background: #fee2e2; color: #991b1b; padding: 10px; border-radius: 6px; font-size: 14px; margin-bottom: 12px; display: none; }
+  .hint { font-size: 12px; color: #9ca3af; text-align: center; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>JIA Parking</h1>
+  <p>Log in with your User ID (cashier) or type "admin"</p>
+  <div class="error" id="err"></div>
+  <input type="text" id="username" placeholder="User ID (or 'admin')" autocomplete="username">
+  <input type="password" id="password" placeholder="Password" autocomplete="current-password">
+  <button onclick="login()">Login</button>
+  <div class="hint">Only admin can add new cashier accounts</div>
+</div>
+<script>
+document.getElementById('password').addEventListener('keypress', e => {
+  if (e.key === 'Enter') login();
+});
+
+async function login() {
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
+  const err = document.getElementById('err');
+  err.style.display = 'none';
+  if (!username || !password) {
+    err.textContent = 'User ID and password required';
+    err.style.display = 'block';
+    return;
+  }
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      err.textContent = data.error;
+      err.style.display = 'block';
+      return;
+    }
+    localStorage.setItem('jia_role', data.role);
+    localStorage.setItem('jia_userid', data.userid);
+    localStorage.setItem('jia_name', data.name);
+    localStorage.setItem('jia_token', data.token);
+    window.location.href = data.role === 'admin' ? '/admin' : '/cashier';
+  } catch (e) {
+    err.textContent = 'Network error: ' + e.message;
+    err.style.display = 'block';
+  }
+}
+
+const role = localStorage.getItem('jia_role');
+if (role) window.location.href = role === 'admin' ? '/admin' : '/cashier';
+</script>
+</body>
+</html>
