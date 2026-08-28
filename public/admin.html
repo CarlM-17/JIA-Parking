@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JIA Parking - Admin</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #f3f4f6; padding: 20px; }
+  h1 { color: #1e40af; margin-bottom: 20px; }
+  nav a { display: inline-block; padding: 8px 16px; background: #1e40af; color: white; text-decoration: none; border-radius: 6px; margin-right: 8px; }
+  .card { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  input, button { padding: 12px; font-size: 16px; border-radius: 6px; border: 1px solid #d1d5db; }
+  button { background: #1e40af; color: white; border: none; cursor: pointer; }
+  button:hover { background: #1e3a8a; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+  th { background: #f9fafb; font-weight: 600; }
+  #qrResult { text-align: center; padding: 20px; }
+  #qrResult img { max-width: 300px; border: 2px solid #1e40af; padding: 8px; border-radius: 8px; }
+  .qr-label { font-size: 24px; font-weight: bold; color: #1e40af; margin: 12px 0; }
+  .btn-share { background: #16a34a; margin: 4px; }
+</style>
+</head>
+<body>
+<h1>JIA Parking - Admin Panel</h1>
+<nav>
+  <a href="/admin">Admin</a>
+  <a href="/cashier">Cashier</a>
+</nav>
+
+<div class="card" style="margin-top:20px">
+  <h2>Register New Member</h2>
+  <p style="color:#6b7280; margin:8px 0">Enter plate number. QR code will be auto-generated.</p>
+  <input id="plate" placeholder="Plate Number (e.g. ABC-1234)" style="width:250px">
+  <input id="owner" placeholder="Owner Name (optional)" style="width:250px">
+  <button onclick="registerMember()">Generate QR</button>
+</div>
+
+<div class="card" id="qrResult" style="display:none">
+  <div class="qr-label" id="qrLabel"></div>
+  <img id="qrImg">
+  <div id="plateLabel" style="margin-top:8px; color:#6b7280"></div>
+  <div style="margin-top:16px">
+    <button class="btn-share" onclick="downloadQR()">Download PNG</button>
+    <button class="btn-share" onclick="shareQR()">Share (Messenger/Viber)</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Registered Members</h2>
+  <button onclick="loadMembers()" style="margin-bottom:10px">Refresh List</button>
+  <table id="membersTable">
+    <thead><tr><th>QR ID</th><th>Plate</th><th>Owner</th><th>Active</th><th>Created</th><th>Action</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+let currentQR = null;
+
+async function registerMember() {
+  const plate = document.getElementById('plate').value.trim();
+  const owner = document.getElementById('owner').value.trim();
+  if (!plate) return alert('Plate number required');
+
+  const res = await fetch('/api/members', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({plate, owner})
+  });
+  const data = await res.json();
+  if (!data.ok) return alert('Error: ' + data.error);
+
+  currentQR = data;
+  document.getElementById('qrLabel').textContent = data.qr_id;
+  document.getElementById('plateLabel').textContent = 'Plate: ' + data.plate;
+  document.getElementById('qrImg').src = data.qr_image;
+  document.getElementById('qrResult').style.display = 'block';
+  document.getElementById('plate').value = '';
+  document.getElementById('owner').value = '';
+  loadMembers();
+}
+
+function downloadQR() {
+  if (!currentQR) return;
+  const a = document.createElement('a');
+  a.href = currentQR.qr_image;
+  a.download = currentQR.qr_id + '.png';
+  a.click();
+}
+
+async function shareQR() {
+  if (!currentQR) return;
+  try {
+    const blob = await (await fetch(currentQR.qr_image)).blob();
+    const file = new File([blob], currentQR.qr_id + '.png', {type: 'image/png'});
+    if (navigator.canShare && navigator.canShare({files: [file]})) {
+      await navigator.share({files: [file], title: 'JIA Parking QR', text: 'Your JIA Church parking QR: ' + currentQR.qr_id});
+    } else {
+      downloadQR();
+      alert('Sharing not supported. QR downloaded - send it manually via Messenger/Viber.');
+    }
+  } catch (e) { console.error(e); }
+}
+
+async function loadMembers() {
+  const res = await fetch('/api/members');
+  const data = await res.json();
+  const tbody = document.querySelector('#membersTable tbody');
+  tbody.innerHTML = '';
+  (data.members || []).forEach(m => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${m.qr_id}</td><td>${m.plate}</td><td>${m.owner}</td>
+      <td>${m.active ? 'YES' : 'NO'}</td><td>${m.created}</td>
+      <td><button onclick="viewQR('${m.qr_id}','${m.plate}')">View QR</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+async function viewQR(id, plate) {
+  const res = await fetch('/api/qr-image?id=' + encodeURIComponent(id));
+  const data = await res.json();
+  currentQR = {qr_id: id, plate: plate, qr_image: data.qr_image};
+  document.getElementById('qrLabel').textContent = id;
+  document.getElementById('plateLabel').textContent = 'Plate: ' + plate;
+  document.getElementById('qrImg').src = data.qr_image;
+  document.getElementById('qrResult').style.display = 'block';
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+loadMembers();
+</script>
+</body>
+</html>

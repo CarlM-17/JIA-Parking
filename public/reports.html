@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JIA Parking - Reports</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #f3f4f6; padding: 20px; }
+  h1 { color: #1e40af; }
+  table { width: 100%; background: white; border-collapse: collapse; margin-top: 12px; }
+  th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+  th { background: #1e40af; color: white; }
+  .totals { background: white; padding: 16px; border-radius: 8px; margin-bottom: 16px; font-size: 18px; }
+</style>
+</head>
+<body>
+<h1>JIA Parking - Reports</h1>
+<nav><a href="/admin">Admin</a> | <a href="/cashier">Cashier</a></nav>
+<div class="totals" id="totals">Loading...</div>
+<table id="logTable">
+  <thead><tr><th>Ticket</th><th>QR ID</th><th>Plate</th><th>Time In</th><th>Time Out</th><th>Hrs</th><th>Charge</th><th>Status</th></tr></thead>
+  <tbody></tbody>
+</table>
+<script>
+async function load() {
+  const res = await fetch('/api/reports');
+  const data = await res.json();
+  document.getElementById('totals').innerHTML =
+    'Total records: <b>' + data.count + '</b> | Total collected: <b>PHP ' + data.total + '</b>';
+  const tbody = document.querySelector('#logTable tbody');
+  tbody.innerHTML = '';
+  data.logs.reverse().forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${r[0]||''}</td><td>${r[1]||''}</td><td>${r[2]||''}</td>
+      <td>${r[3]||''}</td><td>${r[4]||''}</td><td>${r[5]||''}</td>
+      <td>${r[6]||''}</td><td>${r[7]||''}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+load();
+</script>
+</body>
+</html>

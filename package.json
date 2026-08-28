@@ -1,0 +1,12 @@
+{
+  "name": "jia-parking",
+  "version": "1.0.0",
+  "description": "JIA Church Parking QR System",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  }
+}

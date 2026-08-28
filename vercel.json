@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "rewrites": [
+    { "source": "/", "destination": "/public/admin.html" },
+    { "source": "/admin", "destination": "/public/admin.html" },
+    { "source": "/cashier", "destination": "/public/cashier.html" },
+    { "source": "/reports", "destination": "/public/reports.html" }
+  ]
+}
