@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JIA Parking - Manage Cashiers</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #f3f4f6; padding: 20px; }
+  h1 { color: #1e40af; margin-bottom: 20px; }
+  nav a, nav button { display: inline-block; padding: 8px 16px; background: #1e40af; color: white; text-decoration: none; border-radius: 6px; margin-right: 8px; border: none; font-size: 14px; cursor: pointer; }
+  nav .logout { background: #dc2626; }
+  .card { background: white; padding: 20px; border-radius: 10px; margin: 20px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  input, button { padding: 12px; font-size: 16px; border-radius: 6px; border: 1px solid #d1d5db; }
+  button { background: #1e40af; color: white; border: none; cursor: pointer; }
+  button:hover { background: #1e3a8a; }
+  button.small { padding: 6px 10px; font-size: 13px; margin: 2px; }
+  button.danger { background: #dc2626; }
+  button.warn { background: #d97706; }
+  button.ok { background: #16a34a; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+  th { background: #f9fafb; font-weight: 600; }
+  .error { background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 6px; margin-top: 10px; }
+  .success { background: #d1fae5; color: #065f46; padding: 12px; border-radius: 6px; margin-top: 10px; }
+  .field { margin: 8px 0; }
+  .field label { display: block; font-size: 13px; color: #6b7280; margin-bottom: 4px; }
+  .active { color: #16a34a; font-weight: bold; }
+  .inactive { color: #dc2626; font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>Manage Cashiers</h1>
+<nav>
+  <a href="/admin">Admin</a>
+  <a href="/cashiers">Cashiers</a>
+  <a href="/cashier">Scan (Cashier View)</a>
+  <a href="/reports">Reports</a>
+  <button class="logout" onclick="logout()">Logout</button>
+</nav>
+
+<div class="card">
+  <h2>Add New Cashier</h2>
+  <p style="color:#6b7280; margin:8px 0">Cashier will log in using User ID + Password. Their name will be recorded on every scan.</p>
+  <div class="field">
+    <label>User ID (number or code, e.g. C001, 12345)</label>
+    <input id="userid" style="width:250px" placeholder="e.g. C001">
+  </div>
+  <div class="field">
+    <label>Complete Name</label>
+    <input id="name" style="width:350px" placeholder="e.g. Juan Dela Cruz">
+  </div>
+  <div class="field">
+    <label>Password (cashier will type this to log in)</label>
+    <input id="password" type="text" style="width:250px" placeholder="Set a password">
+  </div>
+  <button onclick="addCashier()">Add Cashier</button>
+  <div id="msg"></div>
+</div>
+
+<div class="card">
+  <h2>All Cashiers</h2>
+  <button onclick="loadCashiers()" style="margin-bottom:10px">Refresh</button>
+  <table id="cashiersTable">
+    <thead><tr><th>User ID</th><th>Name</th><th>Password</th><th>Status</th><th>Added</th><th>Actions</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+const TOKEN = localStorage.getItem('jia_token');
+const ROLE = localStorage.getItem('jia_role');
+const USERID = localStorage.getItem('jia_userid');
+if (!TOKEN || ROLE !== 'admin') window.location.href = '/login.html';
+
+function authHeaders() {
+  return { 'Content-Type': 'application/json', 'x-auth-token': TOKEN, 'x-user-id': USERID };
+}
+
+function logout() {
+  localStorage.clear();
+  window.location.href = '/login.html';
+}
+
+async function addCashier() {
+  const userid = document.getElementById('userid').value.trim();
+  const name = document.getElementById('name').value.trim();
+  const password = document.getElementById('password').value.trim();
+  const msg = document.getElementById('msg');
+  msg.innerHTML = '';
+  if (!userid || !name || !password) {
+    msg.innerHTML = '<div class="error">All 3 fields are required</div>';
+    return;
+  }
+  try {
+    const res = await fetch('/api/cashiers', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ userid, name, password })
+    });
+    if (res.status === 401) return logout();
+    const data = await res.json();
+    if (!data.ok) {
+      msg.innerHTML = '<div class="error">' + data.error + '</div>';
+    } else {
+      msg.innerHTML = '<div class="success">Cashier added: ' + name + ' (' + userid + ')</div>';
+      document.getElementById('userid').value = '';
+      document.getElementById('name').value = '';
+      document.getElementById('password').value = '';
+      loadCashiers();
+    }
+  } catch (e) {
+    msg.innerHTML = '<div class="error">Network error: ' + e.message + '</div>';
+  }
+}
+
+async function loadCashiers() {
+  try {
+    const res = await fetch('/api/cashiers', { headers: authHeaders() });
+    if (res.status === 401) return logout();
+    const data = await res.json();
+    const tbody = document.querySelector('#cashiersTable tbody');
+    tbody.innerHTML = '';
+    (data.cashiers || []).forEach(c => {
+      const status = c.active
+        ? '<span class="active">ACTIVE</span>'
+        : '<span class="inactive">DEACTIVATED</span>';
+      const toggleBtn = c.active
+        ? '<button class="small danger" onclick="toggleCashier(\'' + c.userid + '\',\'deactivate\')">Deactivate</button>'
+        : '<button class="small ok" onclick="toggleCashier(\'' + c.userid + '\',\'activate\')">Activate</button>';
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + c.userid + '</td><td>' + c.name + '</td>' +
+        '<td>' + c.password + '</td><td>' + status + '</td><td>' + c.added + '</td>' +
+        '<td>' + toggleBtn +
+        '<button class="small warn" onclick="resetPassword(\'' + c.userid + '\')">Reset Password</button></td>';
+      tbody.appendChild(tr);
+    });
+  } catch(e) { console.error(e); }
+}
+
+async function toggleCashier(userid, action) {
+  if (!confirm(action.toUpperCase() + ' cashier ' + userid + '?')) return;
+  const res = await fetch('/api/cashiers', {
+    method: 'PATCH', headers: authHeaders(),
+    body: JSON.stringify({ userid, action })
+  });
+  const data = await res.json();
+  if (data.ok) loadCashiers();
+  else alert('Error: ' + data.error);
+}
+
+async function resetPassword(userid) {
+  const new_password = prompt('Enter new password for ' + userid + ':');
+  if (!new_password) return;
+  const res = await fetch('/api/cashiers', {
+    method: 'PATCH', headers: authHeaders(),
+    body: JSON.stringify({ userid, action: 'reset_password', new_password })
+  });
+  const data = await res.json();
+  if (data.ok) { alert('Password reset to: ' + new_password); loadCashiers(); }
+  else alert('Error: ' + data.error);
+}
+
+loadCashiers();
+</script>
+</body>
+</html>
