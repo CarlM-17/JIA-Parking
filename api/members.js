@@ -1,11 +1,15 @@
 const { getRange, appendRow } = require('../lib/sheets');
+const { requireAuth } = require('../lib/auth');
 const QRCode = require('qrcode');
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-auth-token, x-user-id');
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  const user = await requireAuth(req, res, 'admin');
+  if (!user) return;
 
   try {
     if (req.method === 'GET') {
@@ -47,7 +51,7 @@ module.exports = async (req, res) => {
 
     res.status(405).json({ ok: false, error: 'method not allowed' });
   } catch (err) {
-    res.status(500).json({ ok: false, error: err.message, stack: err.stack });
+    res.status(500).json({ ok: false, error: err.message });
   }
 };
 
