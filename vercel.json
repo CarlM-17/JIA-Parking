@@ -1,9 +1,11 @@
 {
   "version": 2,
   "rewrites": [
-    { "source": "/", "destination": "/admin.html" },
+    { "source": "/", "destination": "/login.html" },
+    { "source": "/login", "destination": "/login.html" },
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/cashier", "destination": "/cashier.html" },
+    { "source": "/cashiers", "destination": "/cashiers.html" },
     { "source": "/reports", "destination": "/reports.html" }
   ]
 }

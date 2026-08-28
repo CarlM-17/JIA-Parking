@@ -7,33 +7,55 @@
 <style>
   body { font-family: system-ui, sans-serif; background: #f3f4f6; padding: 20px; }
   h1 { color: #1e40af; }
-  table { width: 100%; background: white; border-collapse: collapse; margin-top: 12px; }
-  th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+  nav a, nav button { display: inline-block; padding: 6px 12px; background: #1e40af; color: white; text-decoration: none; border-radius: 6px; margin-right: 6px; border: none; cursor: pointer; }
+  nav .logout { background: #dc2626; }
+  table { width: 100%; background: white; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+  th, td { padding: 8px; text-align: left; border-bottom: 1px solid #e5e7eb; }
   th { background: #1e40af; color: white; }
-  .totals { background: white; padding: 16px; border-radius: 8px; margin-bottom: 16px; font-size: 18px; }
+  .totals { background: white; padding: 16px; border-radius: 8px; margin: 16px 0; font-size: 18px; }
+  .wrap { overflow-x: auto; }
 </style>
 </head>
 <body>
 <h1>JIA Parking - Reports</h1>
-<nav><a href="/admin">Admin</a> | <a href="/cashier">Cashier</a></nav>
+<nav>
+  <a href="/admin">Admin</a>
+  <a href="/cashiers">Manage Cashiers</a>
+  <a href="/reports">Reports</a>
+  <button class="logout" onclick="logout()">Logout</button>
+</nav>
 <div class="totals" id="totals">Loading...</div>
+<div class="wrap">
 <table id="logTable">
-  <thead><tr><th>Ticket</th><th>QR ID</th><th>Plate</th><th>Time In</th><th>Time Out</th><th>Hrs</th><th>Charge</th><th>Status</th></tr></thead>
+  <thead><tr><th>Ticket</th><th>QR ID</th><th>Plate</th><th>Time In</th><th>Time Out</th><th>Hrs</th><th>Charge</th><th>Status</th><th>Cashier (In)</th><th>Cashier (Out)</th></tr></thead>
   <tbody></tbody>
 </table>
+</div>
 <script>
+const TOKEN = localStorage.getItem('jia_token');
+const ROLE = localStorage.getItem('jia_role');
+const USERID = localStorage.getItem('jia_userid') || 'admin';
+if (!TOKEN || ROLE !== 'admin') window.location.href = '/login.html';
+
+function logout() {
+  localStorage.clear();
+  window.location.href = '/login.html';
+}
+
 async function load() {
-  const res = await fetch('/api/reports');
+  const res = await fetch('/api/reports', { headers: {'x-auth-token': TOKEN, 'x-user-id': USERID} });
+  if (res.status === 401) return logout();
   const data = await res.json();
   document.getElementById('totals').innerHTML =
     'Total records: <b>' + data.count + '</b> | Total collected: <b>PHP ' + data.total + '</b>';
   const tbody = document.querySelector('#logTable tbody');
   tbody.innerHTML = '';
-  data.logs.reverse().forEach(r => {
+  (data.logs || []).reverse().forEach(r => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${r[0]||''}</td><td>${r[1]||''}</td><td>${r[2]||''}</td>
-      <td>${r[3]||''}</td><td>${r[4]||''}</td><td>${r[5]||''}</td>
-      <td>${r[6]||''}</td><td>${r[7]||''}</td>`;
+    tr.innerHTML = '<td>' + (r[0]||'') + '</td><td>' + (r[1]||'') + '</td><td>' + (r[2]||'') + '</td>' +
+      '<td>' + (r[3]||'') + '</td><td>' + (r[4]||'') + '</td><td>' + (r[5]||'') + '</td>' +
+      '<td>' + (r[6]||'') + '</td><td>' + (r[7]||'') + '</td>' +
+      '<td>' + (r[8]||'') + '</td><td>' + (r[9]||'') + '</td>';
     tbody.appendChild(tr);
   });
 }

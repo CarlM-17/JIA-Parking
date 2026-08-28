@@ -8,7 +8,9 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, -apple-system, sans-serif; background: #f3f4f6; padding: 20px; }
   h1 { color: #1e40af; margin-bottom: 20px; }
-  nav a { display: inline-block; padding: 8px 16px; background: #1e40af; color: white; text-decoration: none; border-radius: 6px; margin-right: 8px; }
+  nav { margin-bottom: 12px; }
+  nav a, nav button { display: inline-block; padding: 8px 16px; background: #1e40af; color: white; text-decoration: none; border-radius: 6px; margin-right: 8px; border: none; font-size: 14px; cursor: pointer; }
+  nav .logout { background: #dc2626; }
   .card { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
   input, button { padding: 12px; font-size: 16px; border-radius: 6px; border: 1px solid #d1d5db; }
   button { background: #1e40af; color: white; border: none; cursor: pointer; }
@@ -27,27 +29,30 @@
   .success { background: #d1fae5; color: #065f46; padding: 12px; border-radius: 6px; margin-top: 10px; }
   .field { margin: 8px 0; }
   .field label { display: block; font-size: 13px; color: #6b7280; margin-bottom: 4px; }
+  .used { color: #dc2626; font-weight: bold; }
+  .active { color: #16a34a; font-weight: bold; }
 </style>
 </head>
 <body>
 <h1>JIA Parking - Admin Panel</h1>
 <nav>
   <a href="/admin">Admin</a>
-  <a href="/cashier">Cashier</a>
+  <a href="/cashiers">Manage Cashiers</a>
+  <a href="/cashier">Scan (Cashier View)</a>
   <a href="/reports">Reports</a>
-  <a href="/api/health" target="_blank">System Check</a>
+  <button class="logout" onclick="logout()">Logout</button>
 </nav>
 
-<div class="card" style="margin-top:20px">
+<div class="card">
   <h2>Generate QR Codes (Bulk)</h2>
-  <p style="color:#6b7280; margin:8px 0">Enter how many QR codes to generate. They will be numbered JIA-0001, JIA-0002, etc.</p>
+  <p style="color:#6b7280; margin:8px 0">Each QR is valid for ONE entry + ONE exit only. After exit, it deactivates automatically.</p>
   <div class="field">
     <label>Quantity</label>
     <input id="quantity" type="number" min="1" max="200" value="10" style="width:120px">
   </div>
   <div class="field">
-    <label>Batch note (optional - e.g. "Sunday Service Batch 1")</label>
-    <input id="note" placeholder="Optional label saved with each QR" style="width:350px">
+    <label>Batch note (optional)</label>
+    <input id="note" placeholder="e.g. Sunday Service Batch 1" style="width:350px">
   </div>
   <button id="genBtn" onclick="generate()">Generate QR Codes</button>
   <div id="msg"></div>
@@ -56,7 +61,7 @@
 <div class="card" id="qrResults" style="display:none">
   <h2>Generated QR Codes</h2>
   <div style="margin:10px 0">
-    <button onclick="downloadAll()">Download All (ZIP-like via browser)</button>
+    <button onclick="downloadAll()">Download All</button>
     <button onclick="printAll()" style="background:#6b7280">Print All</button>
   </div>
   <div class="qr-grid" id="qrGrid"></div>
@@ -66,12 +71,26 @@
   <h2>All Registered QR Codes</h2>
   <button onclick="loadMembers()" style="margin-bottom:10px">Refresh List</button>
   <table id="membersTable">
-    <thead><tr><th>QR ID</th><th>Note</th><th>Active</th><th>Created</th><th>Action</th></tr></thead>
+    <thead><tr><th>QR ID</th><th>Note</th><th>Status</th><th>Created</th><th>Action</th></tr></thead>
     <tbody></tbody>
   </table>
 </div>
 
 <script>
+const TOKEN = localStorage.getItem('jia_token');
+const ROLE = localStorage.getItem('jia_role');
+const USERID = localStorage.getItem('jia_userid') || 'admin';
+if (!TOKEN || ROLE !== 'admin') window.location.href = '/login.html';
+
+function authHeaders() {
+  return { 'Content-Type': 'application/json', 'x-auth-token': TOKEN, 'x-user-id': USERID };
+}
+
+function logout() {
+  localStorage.clear();
+  window.location.href = '/login.html';
+}
+
 let lastGenerated = [];
 
 async function generate() {
@@ -87,20 +106,21 @@ async function generate() {
   }
 
   btn.disabled = true;
-  btn.textContent = 'Generating ' + quantity + ' QR codes... please wait';
+  btn.textContent = 'Generating ' + quantity + ' QR codes...';
 
   try {
     const res = await fetch('/api/members', {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: authHeaders(),
       body: JSON.stringify({ quantity, note })
     });
+    if (res.status === 401) return logout();
     const data = await res.json();
     if (!data.ok) {
-      msg.innerHTML = '<div class="error"><b>Error:</b> ' + data.error + '<br><small>Check /api/health to verify Google Sheets connection</small></div>';
+      msg.innerHTML = '<div class="error"><b>Error:</b> ' + data.error + '</div>';
     } else {
       lastGenerated = data.generated;
-      msg.innerHTML = '<div class="success">Generated ' + data.count + ' QR codes successfully!</div>';
+      msg.innerHTML = '<div class="success">Generated ' + data.count + ' QR codes!</div>';
       showQRs(data.generated);
       loadMembers();
     }
@@ -146,7 +166,7 @@ async function shareOne(id, dataUrl) {
       await navigator.share({files: [file], title: 'JIA Parking QR', text: 'Your JIA Church parking QR: ' + id});
     } else {
       downloadOne(id, dataUrl);
-      alert('Sharing not supported on this browser. QR downloaded - send it manually.');
+      alert('Sharing not supported. QR downloaded - send it manually.');
     }
   } catch (e) { console.error(e); }
 }
@@ -165,14 +185,18 @@ function printAll() {
 
 async function loadMembers() {
   try {
-    const res = await fetch('/api/members');
+    const res = await fetch('/api/members', { headers: {'x-auth-token': TOKEN, 'x-user-id': USERID} });
+    if (res.status === 401) return logout();
     const data = await res.json();
     const tbody = document.querySelector('#membersTable tbody');
     tbody.innerHTML = '';
     (data.members || []).forEach(m => {
+      const status = m.active
+        ? '<span class="active">ACTIVE</span>'
+        : '<span class="used">USED</span>';
       const tr = document.createElement('tr');
       tr.innerHTML = '<td>' + m.qr_id + '</td><td>' + (m.owner||'') + '</td>' +
-        '<td>' + (m.active ? 'YES' : 'NO') + '</td><td>' + m.created + '</td>' +
+        '<td>' + status + '</td><td>' + m.created + '</td>' +
         '<td><button onclick="viewQR(\'' + m.qr_id + '\')">View QR</button></td>';
       tbody.appendChild(tr);
     });
