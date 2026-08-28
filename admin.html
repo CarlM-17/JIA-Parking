@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JIA Parking - Admin</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #f3f4f6; padding: 20px; }
+  h1 { color: #1e40af; margin-bottom: 20px; }
+  nav a { display: inline-block; padding: 8px 16px; background: #1e40af; color: white; text-decoration: none; border-radius: 6px; margin-right: 8px; }
+  .card { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  input, button { padding: 12px; font-size: 16px; border-radius: 6px; border: 1px solid #d1d5db; }
+  button { background: #1e40af; color: white; border: none; cursor: pointer; }
+  button:hover { background: #1e3a8a; }
+  button:disabled { background: #9ca3af; cursor: not-allowed; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+  th { background: #f9fafb; font-weight: 600; }
+  .qr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-top: 16px; }
+  .qr-item { border: 2px solid #1e40af; border-radius: 8px; padding: 12px; text-align: center; background: white; }
+  .qr-item img { width: 100%; max-width: 180px; }
+  .qr-item .id { font-weight: bold; color: #1e40af; margin: 8px 0; }
+  .qr-item button { padding: 6px 10px; font-size: 13px; margin: 2px; }
+  .btn-share { background: #16a34a; }
+  .error { background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 6px; margin-top: 10px; }
+  .success { background: #d1fae5; color: #065f46; padding: 12px; border-radius: 6px; margin-top: 10px; }
+  .field { margin: 8px 0; }
+  .field label { display: block; font-size: 13px; color: #6b7280; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<h1>JIA Parking - Admin Panel</h1>
+<nav>
+  <a href="/admin">Admin</a>
+  <a href="/cashier">Cashier</a>
+  <a href="/reports">Reports</a>
+  <a href="/api/health" target="_blank">System Check</a>
+</nav>
+
+<div class="card" style="margin-top:20px">
+  <h2>Generate QR Codes (Bulk)</h2>
+  <p style="color:#6b7280; margin:8px 0">Enter how many QR codes to generate. They will be numbered JIA-0001, JIA-0002, etc.</p>
+  <div class="field">
+    <label>Quantity</label>
+    <input id="quantity" type="number" min="1" max="200" value="10" style="width:120px">
+  </div>
+  <div class="field">
+    <label>Batch note (optional - e.g. "Sunday Service Batch 1")</label>
+    <input id="note" placeholder="Optional label saved with each QR" style="width:350px">
+  </div>
+  <button id="genBtn" onclick="generate()">Generate QR Codes</button>
+  <div id="msg"></div>
+</div>
+
+<div class="card" id="qrResults" style="display:none">
+  <h2>Generated QR Codes</h2>
+  <div style="margin:10px 0">
+    <button onclick="downloadAll()">Download All (ZIP-like via browser)</button>
+    <button onclick="printAll()" style="background:#6b7280">Print All</button>
+  </div>
+  <div class="qr-grid" id="qrGrid"></div>
+</div>
+
+<div class="card">
+  <h2>All Registered QR Codes</h2>
+  <button onclick="loadMembers()" style="margin-bottom:10px">Refresh List</button>
+  <table id="membersTable">
+    <thead><tr><th>QR ID</th><th>Note</th><th>Active</th><th>Created</th><th>Action</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+let lastGenerated = [];
+
+async function generate() {
+  const quantity = parseInt(document.getElementById('quantity').value) || 0;
+  const note = document.getElementById('note').value.trim();
+  const btn = document.getElementById('genBtn');
+  const msg = document.getElementById('msg');
+  msg.innerHTML = '';
+
+  if (quantity < 1 || quantity > 200) {
+    msg.innerHTML = '<div class="error">Quantity must be between 1 and 200</div>';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Generating ' + quantity + ' QR codes... please wait';
+
+  try {
+    const res = await fetch('/api/members', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ quantity, note })
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      msg.innerHTML = '<div class="error"><b>Error:</b> ' + data.error + '<br><small>Check /api/health to verify Google Sheets connection</small></div>';
+    } else {
+      lastGenerated = data.generated;
+      msg.innerHTML = '<div class="success">Generated ' + data.count + ' QR codes successfully!</div>';
+      showQRs(data.generated);
+      loadMembers();
+    }
+  } catch (e) {
+    msg.innerHTML = '<div class="error">Network error: ' + e.message + '</div>';
+  }
+  btn.disabled = false;
+  btn.textContent = 'Generate QR Codes';
+}
+
+function showQRs(items) {
+  const grid = document.getElementById('qrGrid');
+  grid.innerHTML = '';
+  items.forEach(it => {
+    const div = document.createElement('div');
+    div.className = 'qr-item';
+    div.innerHTML =
+      '<img src="' + it.qr_image + '">' +
+      '<div class="id">' + it.qr_id + '</div>' +
+      '<button onclick="downloadOne(\'' + it.qr_id + '\',\'' + it.qr_image + '\')">Download</button>' +
+      '<button class="btn-share" onclick="shareOne(\'' + it.qr_id + '\',\'' + it.qr_image + '\')">Share</button>';
+    grid.appendChild(div);
+  });
+  document.getElementById('qrResults').style.display = 'block';
+}
+
+function downloadOne(id, dataUrl) {
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = id + '.png';
+  a.click();
+}
+
+function downloadAll() {
+  lastGenerated.forEach((it, i) => setTimeout(() => downloadOne(it.qr_id, it.qr_image), i * 200));
+}
+
+async function shareOne(id, dataUrl) {
+  try {
+    const blob = await (await fetch(dataUrl)).blob();
+    const file = new File([blob], id + '.png', {type: 'image/png'});
+    if (navigator.canShare && navigator.canShare({files: [file]})) {
+      await navigator.share({files: [file], title: 'JIA Parking QR', text: 'Your JIA Church parking QR: ' + id});
+    } else {
+      downloadOne(id, dataUrl);
+      alert('Sharing not supported on this browser. QR downloaded - send it manually.');
+    }
+  } catch (e) { console.error(e); }
+}
+
+function printAll() {
+  const w = window.open('', '_blank');
+  let html = '<html><head><title>JIA QR Codes</title><style>body{font-family:sans-serif;padding:20px}.q{display:inline-block;text-align:center;margin:10px;padding:10px;border:2px solid #1e40af;border-radius:8px;page-break-inside:avoid}.q img{width:200px}.q div{font-weight:bold;color:#1e40af;margin-top:8px}</style></head><body>';
+  lastGenerated.forEach(it => {
+    html += '<div class="q"><img src="' + it.qr_image + '"><div>' + it.qr_id + '</div></div>';
+  });
+  html += '</body></html>';
+  w.document.write(html);
+  w.document.close();
+  setTimeout(() => w.print(), 500);
+}
+
+async function loadMembers() {
+  try {
+    const res = await fetch('/api/members');
+    const data = await res.json();
+    const tbody = document.querySelector('#membersTable tbody');
+    tbody.innerHTML = '';
+    (data.members || []).forEach(m => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + m.qr_id + '</td><td>' + (m.owner||'') + '</td>' +
+        '<td>' + (m.active ? 'YES' : 'NO') + '</td><td>' + m.created + '</td>' +
+        '<td><button onclick="viewQR(\'' + m.qr_id + '\')">View QR</button></td>';
+      tbody.appendChild(tr);
+    });
+  } catch(e) { console.error(e); }
+}
+
+async function viewQR(id) {
+  const res = await fetch('/api/qr-image?id=' + encodeURIComponent(id));
+  const data = await res.json();
+  if (data.ok) {
+    lastGenerated = [{qr_id: id, qr_image: data.qr_image}];
+    showQRs(lastGenerated);
+    window.scrollTo({top: 0, behavior: 'smooth'});
+  }
+}
+
+loadMembers();
+</script>
+</body>
+</html>
