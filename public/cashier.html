@@ -8,44 +8,78 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: white; padding: 12px; min-height: 100vh; }
-  h1 { color: #60a5fa; margin-bottom: 12px; text-align: center; }
+  h1 { color: #60a5fa; margin-bottom: 8px; text-align: center; }
+  .whoami { text-align: center; color: #94a3b8; margin-bottom: 10px; font-size: 14px; }
   nav { text-align: center; margin-bottom: 12px; }
-  nav a, nav button { display: inline-block; padding: 6px 12px; background: #1e40af; color: white; text-decoration: none; border-radius: 6px; margin: 0 4px; font-size: 14px; border: none; cursor: pointer; }
-  nav .logout { background: #dc2626; }
-  #reader { width: 100%; max-width: 400px; margin: 0 auto; border-radius: 12px; overflow: hidden; background: #1e293b; }
+  nav button { padding: 6px 12px; background: #dc2626; color: white; border-radius: 6px; border: none; cursor: pointer; font-size: 14px; }
+  .main-btn { display: block; width: 100%; max-width: 500px; margin: 16px auto; padding: 24px; font-size: 24px; font-weight: bold; background: #1e40af; color: white; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 12px rgba(30,64,175,0.4); }
+  .main-btn:hover { background: #1e3a8a; }
+  .main-btn.scanning { background: #dc2626; }
+  #scanArea { max-width: 500px; margin: 0 auto; display: none; }
+  #reader { width: 100%; border-radius: 12px; overflow: hidden; background: #1e293b; }
   .card { background: #1e293b; padding: 16px; border-radius: 12px; margin: 12px auto; max-width: 500px; }
   .result-ok { background: #065f46; border: 2px solid #10b981; }
   .result-entry { background: #1e3a8a; border: 2px solid #3b82f6; }
   .result-err { background: #7f1d1d; border: 2px solid #ef4444; }
+  .result-plate { background: #78350f; border: 2px solid #f59e0b; }
   .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
   .row:last-child { border: none; }
   .lbl { color: #94a3b8; }
   .val { font-weight: 600; }
-  .big { font-size: 32px; text-align: center; padding: 12px; color: #fbbf24; font-weight: bold; }
+  .big { font-size: 28px; text-align: center; padding: 10px; color: #fbbf24; font-weight: bold; }
   .charge { font-size: 48px; text-align: center; padding: 16px; color: #fbbf24; font-weight: bold; }
-  button { width: 100%; padding: 14px; font-size: 18px; border-radius: 8px; border: none; background: #1e40af; color: white; cursor: pointer; margin-top: 8px; }
-  button:hover { background: #1e3a8a; }
-  .manual { margin: 12px auto; max-width: 500px; }
-  .manual input { width: 100%; padding: 12px; font-size: 16px; border-radius: 6px; border: 1px solid #334155; background: #1e293b; color: white; }
+  button { padding: 12px; font-size: 16px; border-radius: 8px; border: none; background: #1e40af; color: white; cursor: pointer; margin-top: 8px; }
+  .btn-wide { width: 100%; padding: 14px; font-size: 18px; }
+  input { width: 100%; padding: 12px; font-size: 18px; border-radius: 6px; border: 1px solid #334155; background: #1e293b; color: white; margin-bottom: 10px; text-transform: uppercase; }
+  .manual { margin: 10px 0; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 500px; margin: 16px auto; }
+  .stat { background: #1e293b; padding: 12px; border-radius: 8px; text-align: center; }
+  .stat .num { font-size: 24px; font-weight: bold; color: #60a5fa; }
+  .stat .lbl2 { font-size: 11px; color: #94a3b8; text-transform: uppercase; }
+  .table-wrap { max-width: 100%; overflow-x: auto; margin: 12px auto; }
+  table { width: 100%; background: #1e293b; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 8px; text-align: left; border-bottom: 1px solid #334155; }
+  th { background: #0f172a; color: #60a5fa; }
+  tr.active-row { background: #1e3a8a; }
+  .status-active { color: #fbbf24; font-weight: bold; }
+  .status-done { color: #10b981; font-weight: bold; }
 </style>
 </head>
 <body>
-<h1>JIA Cashier - Scan QR</h1>
-<div style="text-align:center;color:#94a3b8;margin-bottom:8px;font-size:14px">Logged in as: <span id="whoami"></span></div>
-<nav>
-  <a href="/cashier">Scan</a>
-  <button class="logout" onclick="logout()">Logout</button>
-</nav>
-<script>document.getElementById('whoami').textContent = USERID + ' - ' + NAME;</script>
+<h1>JIA Cashier</h1>
+<div class="whoami">Logged in as: <span id="whoami"></span></div>
+<nav><button onclick="logout()">Logout</button></nav>
 
-<div id="reader"></div>
+<button id="scanBtn" class="main-btn" onclick="toggleScan()">Scan QR Code</button>
 
-<div class="manual">
-  <input id="manualInput" placeholder="Or type QR code manually (e.g. JIA-0001)">
-  <button onclick="manualSubmit()">Submit</button>
+<div id="scanArea">
+  <div id="reader"></div>
+  <div class="manual">
+    <input id="manualInput" placeholder="OR type QR code (e.g. JIA-0001)" style="text-transform:uppercase">
+    <button class="btn-wide" onclick="manualSubmit()">Submit</button>
+  </div>
 </div>
 
 <div id="resultBox"></div>
+
+<div class="stats">
+  <div class="stat"><div class="num" id="statTotal">0</div><div class="lbl2">Total Today</div></div>
+  <div class="stat"><div class="num" id="statActive">0</div><div class="lbl2">Still Parked</div></div>
+  <div class="stat"><div class="num" id="statCharge">PHP 0</div><div class="lbl2">Collected</div></div>
+</div>
+
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <strong>Today's Scans</strong>
+    <button onclick="loadToday()" style="padding:4px 10px;font-size:13px">Refresh</button>
+  </div>
+  <div class="table-wrap">
+    <table id="todayTable">
+      <thead><tr><th>Ticket</th><th>QR</th><th>Plate</th><th>In</th><th>Out</th><th>Charge</th><th>Status</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
 
 <script>
 const TOKEN = localStorage.getItem('jia_token');
@@ -53,15 +87,19 @@ const ROLE = localStorage.getItem('jia_role');
 const USERID = localStorage.getItem('jia_userid') || 'admin';
 const NAME = localStorage.getItem('jia_name') || '';
 if (!TOKEN || (ROLE !== 'admin' && ROLE !== 'cashier')) window.location.href = '/login.html';
+document.getElementById('whoami').textContent = USERID + ' - ' + NAME;
 
-function logout() {
-  localStorage.clear();
-  window.location.href = '/login.html';
+function logout() { localStorage.clear(); window.location.href = '/login.html'; }
+
+function authHeaders() {
+  return {'Content-Type':'application/json', 'x-auth-token': TOKEN, 'x-user-id': USERID};
 }
 
 let scanner = null;
+let scanning = false;
 let processing = false;
 let lastScanTime = 0;
+let pendingEntry = null; // { qr_id } waiting for plate
 
 function beep(type) {
   try {
@@ -70,65 +108,93 @@ function beep(type) {
     const gain = ctx.createGain();
     osc.connect(gain); gain.connect(ctx.destination);
     if (type === 'ok') {
-      osc.frequency.value = 880; // high pitch success
+      osc.frequency.value = 880;
       gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.15);
+      osc.start(); osc.stop(ctx.currentTime + 0.15);
     } else if (type === 'exit') {
-      // Two beeps for exit
       osc.frequency.value = 660;
       gain.gain.setValueAtTime(0.3, ctx.currentTime);
       osc.start();
       osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
       osc.stop(ctx.currentTime + 0.35);
     } else {
-      // Error - low buzz
-      osc.frequency.value = 200;
-      osc.type = 'sawtooth';
+      osc.frequency.value = 200; osc.type = 'sawtooth';
       gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.4);
+      osc.start(); osc.stop(ctx.currentTime + 0.4);
     }
-  } catch(e) { console.log('Audio unavailable'); }
+  } catch(e) {}
 }
 
-function startScanner() {
-  scanner = new Html5Qrcode('reader');
-  const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-  scanner.start({ facingMode: 'environment' }, config, onScanSuccess).catch(err => {
+async function toggleScan() {
+  if (scanning) {
+    await stopScanner();
+    document.getElementById('scanArea').style.display = 'none';
+    document.getElementById('scanBtn').textContent = 'Scan QR Code';
+    document.getElementById('scanBtn').classList.remove('scanning');
+  } else {
+    document.getElementById('scanArea').style.display = 'block';
+    document.getElementById('scanBtn').textContent = 'Stop Scanner';
+    document.getElementById('scanBtn').classList.add('scanning');
+    await startScanner();
+  }
+}
+
+async function startScanner() {
+  scanning = true;
+  try {
+    scanner = new Html5Qrcode('reader');
+    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+    await scanner.start({ facingMode: 'environment' }, config, onScanSuccess);
+  } catch (err) {
     document.getElementById('reader').innerHTML =
-      '<div style="padding:20px;text-align:center;color:#fbbf24">Camera not available. Use manual entry below.<br><small>' + err + '</small></div>';
-  });
+      '<div style="padding:20px;text-align:center;color:#fbbf24">Camera unavailable. Type QR manually below.<br><small>' + err + '</small></div>';
+  }
+}
+
+async function stopScanner() {
+  scanning = false;
+  if (scanner) {
+    try { await scanner.stop(); await scanner.clear(); } catch(e) {}
+    scanner = null;
+  }
 }
 
 function onScanSuccess(decodedText) {
   const now = Date.now();
   if (processing || (now - lastScanTime < 3000)) return;
   lastScanTime = now;
-  processScan(decodedText.trim());
+  processScan(decodedText.trim().toUpperCase());
 }
 
 async function manualSubmit() {
-  const val = document.getElementById('manualInput').value.trim();
+  const val = document.getElementById('manualInput').value.trim().toUpperCase();
   if (!val) return;
   document.getElementById('manualInput').value = '';
   await processScan(val);
 }
 
-async function processScan(qr_id) {
+async function processScan(qr_id, plate) {
   processing = true;
   showLoading(qr_id);
   try {
     const res = await fetch('/api/scan', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json', 'x-auth-token': TOKEN, 'x-user-id': USERID},
-      body: JSON.stringify({ qr_id })
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ qr_id, plate: plate || '' })
     });
     if (res.status === 401) return logout();
     const data = await res.json();
-    if (data.ok) {
+
+    if (data.needs_plate) {
+      beep('ok');
+      showPlatePrompt(qr_id);
+    } else if (data.ok) {
       beep(data.mode === 'EXIT' ? 'exit' : 'ok');
       showResult(data);
+      await stopScanner();
+      document.getElementById('scanArea').style.display = 'none';
+      document.getElementById('scanBtn').textContent = 'Scan QR Code';
+      document.getElementById('scanBtn').classList.remove('scanning');
+      loadToday();
     } else {
       beep('err');
       showError(data.error || 'Unknown error', qr_id);
@@ -137,12 +203,37 @@ async function processScan(qr_id) {
     beep('err');
     showError('Network error: ' + e.message, qr_id);
   }
-  setTimeout(() => { processing = false; }, 2000);
+  setTimeout(() => { processing = false; }, 1500);
 }
 
 function showLoading(id) {
   document.getElementById('resultBox').innerHTML =
     '<div class="card"><div style="text-align:center">Checking ' + id + '...</div></div>';
+}
+
+function showPlatePrompt(qr_id) {
+  pendingEntry = qr_id;
+  const html = '<div class="card result-plate">' +
+    '<div class="big">ENTRY</div>' +
+    '<div class="row"><span class="lbl">QR ID</span><span class="val">' + qr_id + '</span></div>' +
+    '<div style="margin-top:16px"><label style="color:#fde68a;font-size:14px">Enter plate number:</label></div>' +
+    '<input id="plateInput" placeholder="e.g. ABC-1234" style="margin-top:8px;background:#451a03;color:white;font-size:22px;text-align:center">' +
+    '<button class="btn-wide" onclick="submitPlate()">Confirm Entry</button>' +
+    '<button class="btn-wide" style="background:#6b7280" onclick="clearResult()">Cancel</button>' +
+    '</div>';
+  document.getElementById('resultBox').innerHTML = html;
+  setTimeout(() => {
+    const inp = document.getElementById('plateInput');
+    if (inp) { inp.focus(); inp.addEventListener('keypress', e => { if (e.key === 'Enter') submitPlate(); }); }
+  }, 100);
+}
+
+async function submitPlate() {
+  const plate = document.getElementById('plateInput').value.trim().toUpperCase();
+  if (!plate) { alert('Plate number required'); return; }
+  const qr = pendingEntry;
+  pendingEntry = null;
+  await processScan(qr, plate);
 }
 
 function showResult(d) {
@@ -152,7 +243,6 @@ function showResult(d) {
   html += '<div class="row"><span class="lbl">Ticket</span><span class="val">' + d.ticket_no + '</span></div>';
   html += '<div class="row"><span class="lbl">QR ID</span><span class="val">' + d.qr_id + '</span></div>';
   if (d.plate) html += '<div class="row"><span class="lbl">Plate</span><span class="val">' + d.plate + '</span></div>';
-  if (d.owner) html += '<div class="row"><span class="lbl">Note</span><span class="val">' + d.owner + '</span></div>';
   html += '<div class="row"><span class="lbl">Time In</span><span class="val">' + d.time_in + '</span></div>';
   if (d.mode === 'EXIT') {
     html += '<div class="row"><span class="lbl">Time Out</span><span class="val">' + d.time_out + '</span></div>';
@@ -160,12 +250,12 @@ function showResult(d) {
     html += '<div class="row"><span class="lbl">Cashier (In)</span><span class="val">' + (d.cashier_in||'-') + '</span></div>';
     html += '<div class="row"><span class="lbl">Cashier (Out)</span><span class="val">' + (d.cashier_out||'-') + '</span></div>';
     html += '<div class="charge">PHP ' + d.charge + '</div>';
-    html += '<div style="text-align:center;color:#fca5a5;padding:8px">QR is now deactivated (one-time use)</div>';
+    html += '<div style="text-align:center;color:#fca5a5;padding:8px">QR deactivated (one-time use)</div>';
   } else {
     html += '<div class="row"><span class="lbl">Cashier</span><span class="val">' + (d.cashier||'-') + '</span></div>';
     html += '<div style="text-align:center;padding:12px;color:#93c5fd">Ticket issued. Scan again upon exit.</div>';
   }
-  html += '<button onclick="clearResult()">Next Scan</button>';
+  html += '<button class="btn-wide" onclick="clearResult()">Done</button>';
   html += '</div>';
   document.getElementById('resultBox').innerHTML = html;
 }
@@ -175,14 +265,46 @@ function showError(msg, qr_id) {
     '<div class="card result-err"><div class="big">INVALID</div>' +
     '<div class="row"><span class="lbl">Code</span><span class="val">' + (qr_id||'') + '</span></div>' +
     '<div class="row"><span class="lbl">Reason</span><span class="val">' + msg + '</span></div>' +
-    '<button onclick="clearResult()">Try Again</button></div>';
+    '<button class="btn-wide" onclick="clearResult()">Try Again</button></div>';
 }
 
 function clearResult() {
   document.getElementById('resultBox').innerHTML = '';
 }
 
-startScanner();
+async function loadToday() {
+  try {
+    const res = await fetch('/api/today', { headers: authHeaders() });
+    if (res.status === 401) return logout();
+    const data = await res.json();
+    if (!data.ok) return;
+    document.getElementById('statTotal').textContent = data.logs.length;
+    document.getElementById('statActive').textContent = data.active_count;
+    document.getElementById('statCharge').textContent = 'PHP ' + data.total_charge;
+
+    const tbody = document.querySelector('#todayTable tbody');
+    tbody.innerHTML = '';
+    if (data.logs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">No scans today yet</td></tr>';
+      return;
+    }
+    data.logs.slice().reverse().forEach(r => {
+      const tr = document.createElement('tr');
+      if (r.status === 'ACTIVE') tr.className = 'active-row';
+      const statusCls = r.status === 'ACTIVE' ? 'status-active' : 'status-done';
+      const timeIn = (r.time_in || '').slice(11, 16);
+      const timeOut = (r.time_out || '').slice(11, 16);
+      tr.innerHTML = '<td>' + r.ticket_no + '</td><td>' + r.qr_id + '</td>' +
+        '<td>' + r.plate + '</td><td>' + timeIn + '</td><td>' + timeOut + '</td>' +
+        '<td>' + (r.charge ? 'P' + r.charge : '-') + '</td>' +
+        '<td class="' + statusCls + '">' + r.status + '</td>';
+      tbody.appendChild(tr);
+    });
+  } catch(e) { console.error(e); }
+}
+
+loadToday();
+setInterval(loadToday, 30000); // auto-refresh every 30s
 </script>
 </body>
 </html>
