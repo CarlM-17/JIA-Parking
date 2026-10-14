@@ -651,8 +651,16 @@ async function processScan(qr,plate){
       document.getElementById('scanArea').style.display='none';
       document.getElementById('scanBtn').textContent='Scan QR Code';
       document.getElementById('scanBtn').classList.remove('on');loadToday();}
-    else{beep('err');showErr(d.error||'Error',qr);}
-  }catch(e){beep('err');showErr(e.message,qr);}
+    else{beep('err');await stopS();
+      document.getElementById('scanArea').style.display='none';
+      document.getElementById('scanBtn').textContent='Scan QR Code';
+      document.getElementById('scanBtn').classList.remove('on');
+      showErr(d.error||'Error',qr);alert('INVALID QR CODE\\n\\n'+(d.error||'Error')+'\\n\\nCode scanned: '+qr);}
+  }catch(e){beep('err');await stopS();
+    document.getElementById('scanArea').style.display='none';
+    document.getElementById('scanBtn').textContent='Scan QR Code';
+    document.getElementById('scanBtn').classList.remove('on');
+    showErr(e.message,qr);alert('ERROR\\n\\n'+e.message);}
   setTimeout(()=>{processing=false;},1500);
 }
 function showPlate(qr){
