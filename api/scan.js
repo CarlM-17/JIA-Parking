@@ -25,24 +25,24 @@ module.exports = async (req, res) => {
 
   try {
     const body = req.body || await parseBody(req);
-    const { qr_id } = body;
+    const qr_id = (body.qr_id || '').trim();
+    const platedInput = (body.plate || '').trim().toUpperCase();
     if (!qr_id) return res.status(400).json({ ok: false, error: 'qr_id required' });
 
     const members = await getRange('Members!A2:E');
-    const memberIdx = members.findIndex(r => (r[0] || '').trim().toUpperCase() === qr_id.trim().toUpperCase());
+    const memberIdx = members.findIndex(r => (r[0] || '').trim().toUpperCase() === qr_id.toUpperCase());
     if (memberIdx === -1) return res.status(404).json({ ok: false, error: 'QR not registered', qr_id });
     const member = members[memberIdx];
     if ((member[3] || '').toString().toUpperCase() !== 'TRUE') {
       return res.status(403).json({ ok: false, error: 'This QR has already been used. Please request a new one.', qr_id });
     }
 
-    const plate = member[1] || '';
     const owner = member[2] || '';
 
     // Sheet columns: A Ticket, B QR, C Plate, D TimeIn, E TimeOut, F Hrs, G Charge, H Status, I CashierIn, J CashierOut
     const logs = await getRange('ParkingLog!A2:J');
     const openIdx = logs.findIndex(r =>
-      (r[1] || '').trim().toUpperCase() === qr_id.trim().toUpperCase() &&
+      (r[1] || '').trim().toUpperCase() === qr_id.toUpperCase() &&
       (!r[4] || r[4].trim() === '') &&
       (r[7] || '').toString().toUpperCase() === 'ACTIVE'
     );
@@ -50,22 +50,31 @@ module.exports = async (req, res) => {
     const isEntry = openIdx === -1;
 
     if (isEntry) {
+      // Entry requires plate number
+      if (!platedInput) {
+        return res.status(200).json({
+          ok: false, needs_plate: true, mode: 'ENTRY',
+          qr_id, error: 'Plate number required for entry'
+        });
+      }
+
       const memberTickets = logs.filter(r => (r[0] || '').startsWith(qr_id + '-T'));
       const nextTicketNum = (memberTickets.length + 1).toString().padStart(3, '0');
       const ticket_no = `${qr_id}-T${nextTicketNum}`;
       const time_in = nowPH();
 
-      await appendRow('ParkingLog!A:J', [ticket_no, qr_id, plate, time_in, '', '', '', 'ACTIVE', cashierTag, '']);
+      await appendRow('ParkingLog!A:J', [ticket_no, qr_id, platedInput, time_in, '', '', '', 'ACTIVE', cashierTag, '']);
 
       return res.status(200).json({
         ok: true, mode: 'ENTRY',
-        ticket_no, qr_id, plate, owner, time_in,
+        ticket_no, qr_id, plate: platedInput, owner, time_in,
         cashier: cashierTag,
         message: 'ENTRY - Ticket Issued'
       });
     } else {
       const row = logs[openIdx];
       const ticket_no = row[0];
+      const plate = row[2] || '';
       const time_in_str = row[3];
       const cashier_in = row[8] || '';
       const time_in = new Date(time_in_str.replace(' ', 'T') + '+08:00');
